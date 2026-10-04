@@ -1,0 +1,25 @@
+name: qualflare_flutter
+description: Labels, links, steps and screenshots for Flutter widget and integration tests, reported to Qualflare.
+version: 0.1.0-dev.1
+homepage: https://qualflare.com/flutter-test-reporting/
+repository: https://github.com/Qualflare/qualflare-flutter
+issue_tracker: https://github.com/Qualflare/qualflare-flutter/issues
+topics:
+  - testing
+  - test-reporting
+  - integration-test
+  - widget-test
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  test_api: any
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
