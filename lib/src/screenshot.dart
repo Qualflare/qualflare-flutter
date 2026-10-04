@@ -10,9 +10,19 @@ import 'package:integration_test/integration_test.dart'
 /// which the native capture needs; done once per process.
 bool _androidSurfaceConverted = false;
 
-/// The current screen as PNG bytes. Never settles. It pumps one frame only
-/// if the screen has changes not yet painted (on a device nothing paints
-/// between test code and the capture), so what it captures is current.
+/// The most frames a capture pumps to get unpainted changes on screen.
+///
+/// One frame paints a normal change. On a device (live) binding the pointer
+/// trail drawn after a tap repaints the screen for two more frames, each
+/// marking it unpainted again, so a capture right after a `tap` needs
+/// up to three. The bound keeps a screen that never stops repainting from
+/// holding the capture; it then fails with a warning instead.
+const _maxPaintFrames = 5;
+
+/// The current screen as PNG bytes. Never settles. Only while the screen has
+/// changes not yet painted (on a device nothing paints between test code and
+/// the capture) it pumps a frame, at most [_maxPaintFrames], so what it
+/// captures is current.
 ///
 /// By default the root layer is rendered. With [native] on an
 /// `integration_test` binding the platform captures the screen instead, which
@@ -34,7 +44,9 @@ Future<List<int>> captureScreenshot(
     _androidSurfaceConverted = true;
     await tester.pump();
   }
-  if (_needsPaint(tester)) await tester.pump();
+  for (var i = 0; i < _maxPaintFrames && _needsPaint(tester); i++) {
+    await tester.pump();
+  }
   // runAsync reports an error thrown by its callback as a test failure, so
   // the callback returns its error instead of throwing it.
   final result = await tester.runAsync<(List<int>?, Object?, StackTrace?)>(
