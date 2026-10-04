@@ -9,14 +9,21 @@ const markerPrefix = '##qualflare[v1] ';
 const defaultChunkSize = 48 * 1024;
 
 /// One marker line: [markerPrefix] followed by [fields] as compact JSON, with
-/// null-valued fields left out. JSON escapes newlines, so the result is always
-/// a single line whatever the field values contain.
+/// null-valued fields left out. JSON escapes newlines, and U+2028, U+2029 and
+/// U+0085 (which some tools also treat as line breaks) are escaped here, so
+/// the result is always a single line whatever the field values contain.
 String encodeMarker(Map<String, Object?> fields) {
   final present = {
     for (final e in fields.entries)
       if (e.value != null) e.key: e.value,
   };
-  return '$markerPrefix${jsonEncode(present)}';
+  // These characters can only occur inside JSON strings, where their \u
+  // escapes mean the same thing.
+  final json = jsonEncode(present)
+      .replaceAll('\u2028', r'\u2028')
+      .replaceAll('\u2029', r'\u2029')
+      .replaceAll('\u0085', r'\u0085');
+  return '$markerPrefix$json';
 }
 
 /// The `att` marker lines for one attachment: its bytes as base64, split into

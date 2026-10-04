@@ -31,3 +31,97 @@ jobs:
           test -n "$id"
           jq -s -e --argjson id "$id" '[.[] | select(.type=="print" and .testID==$id) | .message | select(startswith("##qualflare[v1] "))] | length == 3' results.json
           jq -s -e --argjson id "$id" '[.[] | select(.type=="print" and .testID==$id) | .message | select(startswith("##qualflare[v1] {\"k\":\"label\""))] | length == 1 and (.[0] | contains("mobile-team"))' results.json
+
+  example-widget:
+    name: Example (widget)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+      - name: Run the example widget tests
+        working-directory: example
+        run: |
+          flutter pub get
+          flutter test test/checkout_widget_test.dart --file-reporter json:../results-widget.json || true
+      - name: Markers of every kind landed on the right tests
+        run: |
+          set -euo pipefail
+          example/tool/assert_markers.sh results-widget.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: results-widget
+          path: results-widget.json
+          if-no-files-found: error
+
+  example-android:
+    name: Example (Android emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: example
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          arch: x86_64
+          working-directory: example
+          script: flutter test integration_test/checkout_test.dart -d emulator-5554 --file-reporter json:../results-android.json || true
+      - name: Markers of every kind landed on the right tests, native screenshot included
+        run: |
+          set -euo pipefail
+          example/tool/assert_markers.sh results-android.json native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: results-android
+          path: results-android.json
+          if-no-files-found: error
+
+  example-ios:
+    name: Example (iOS simulator)
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: example
+      - name: Boot the newest iPhone simulator
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | jq -r '
+            [.devices | to_entries[] | select(.key | test("iOS")) | .value[] | select(.name | startswith("iPhone"))]
+            | sort_by(.name) | last | .udid')
+          test -n "$udid" && test "$udid" != null
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
+      - name: Run the example integration test
+        timeout-minutes: 70
+        working-directory: example
+        run: flutter test integration_test/checkout_test.dart -d "$SIM_UDID" --file-reporter json:../results-ios.json || true
+      - name: Markers of every kind landed on the right tests, native screenshot included
+        run: |
+          set -euo pipefail
+          example/tool/assert_markers.sh results-ios.json native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: results-ios
+          path: results-ios.json
+          if-no-files-found: error
