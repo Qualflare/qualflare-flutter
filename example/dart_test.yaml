@@ -1,0 +1,3 @@
+tags:
+  # The deliberately failing example test; excluded from the dogfood upload.
+  demo-failure:

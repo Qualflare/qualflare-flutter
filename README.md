@@ -1,5 +1,7 @@
 # qualflare_flutter
 
+[![Qualflare](https://api.qualflare.com/p/qualflare-flutter/badge.svg)](https://reports.qualflare.com/p/qualflare-flutter/launches)
+
 Labels, links, steps and screenshots for Flutter widget and `integration_test` tests, reported to
 [Qualflare](https://qualflare.com/flutter-test-reporting/).
 
