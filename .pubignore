@@ -1,0 +1,17 @@
+.dart_tool/
+.packages
+build/
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+.idea/
+*.iml
+.DS_Store
+.superpowers/
+
+# Native scaffolding of the example app; the Dart sources stay.
+example/android/
+example/ios/
+example/build/
+example/.dart_tool/
+example/pubspec.lock
