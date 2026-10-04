@@ -32,13 +32,50 @@ testWidgets('pays with a card', (tester) async {
     // … steps nest, and a failing step fails the test as usual
   });
   qualflare.attachment('response.json', bytes, mimeType: 'application/json');
+  await qualflare.screenshot(tester, 'checkout');      // checkout.png on this test
+});
+
+qualflareTestWidgets('pays with a card', (tester) async {
+  // testWidgets, plus a screenshot named failure.png when the body throws
 });
 ```
 
 The names match the `qualflare.*` API of Qualflare's JavaScript reporters. Calls in `setUp` and
 `tearDown` apply to each test; outside a running test, and in `setUpAll`/`tearDownAll`, every call does
 nothing. Attachments are capped at 5 MiB each and 20 MiB per test; anything over a cap
-is dropped with a warning in the test's output.
+is dropped with a warning in the test's output. Names, values, URLs and step names longer than 8192
+characters are cut.
+
+## Screenshots
+
+`qualflare.screenshot(tester, name)` attaches a PNG of what was last painted. It never pumps or
+settles, so it works mid-animation; pump first if you want a change on screen. It renders Flutter's
+root layer, the same way in widget tests and in `integration_test` runs on a device or emulator. In an
+`integration_test` run, `native: true` lets the platform capture the screen instead, which also shows
+platform views (maps, web views) and, on Android, the status bar. A capture that fails records a
+warning; it never fails the test.
+
+`qualflareTestWidgets` takes the same arguments as `testWidgets`. When its body throws (a failed
+`expect`, a missing widget), it attaches `failure.png` and rethrows, so the test fails exactly as
+before. Errors Flutter catches itself, such as an exception during build, are reported after the body
+returns and get no screenshot. Plain `testWidgets` tests can call `qualflare.screenshot` themselves.
+
+Screenshots travel as base64 lines in the test's output, so they also show up in the console output of
+`flutter test`.
+
+### Readable text in widget-test screenshots
+
+Host widget tests draw every glyph as a box (the test font). To render real text, load fonts once per
+test file:
+
+```dart
+setUpAll(() => qualflare.loadFonts());
+```
+
+`loadFonts` loads the fonts in your app's `FontManifest.json` and Roboto (Material's default) from the
+Flutter SDK. It changes text sizes for the rest of the file, which can affect layout and golden tests,
+so it is opt-in. Inside a `testWidgets` body, call it through `tester.runAsync`. It does nothing on a
+device, where real fonts are used already, and nothing when called again.
 
 ## License
 

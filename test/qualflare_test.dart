@@ -3,28 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qualflare_flutter/qualflare_flutter.dart';
-import 'package:qualflare_flutter/src/marker.dart';
 
-/// Runs [body] with `print` captured, returning the decoded marker lines in
-/// order. Lines that are not markers are returned under the key `raw`.
-Future<List<Map<String, Object?>>> capture(
-    FutureOr<void> Function() body) async {
-  final out = <Map<String, Object?>>[];
-  await runZoned(
-    () async => body(),
-    zoneSpecification: ZoneSpecification(
-      print: (self, parent, zone, line) {
-        out.add(
-          line.startsWith(markerPrefix)
-              ? jsonDecode(line.substring(markerPrefix.length))
-                  as Map<String, Object?>
-              : {'raw': line},
-        );
-      },
-    ),
-  );
-  return out;
-}
+import 'capture.dart';
 
 const mib = 1024 * 1024;
 
@@ -230,5 +210,89 @@ void main() {
     expect(warns.single['msg'], contains('one more'));
     expect(out.where((m) => m['k'] == 'att').map((m) => m['id']).toSet(),
         hasLength(4));
+  });
+
+  test('caps long names', () async {
+    final long = 'x' * 10000;
+    final out = await capture(() async {
+      qualflare.label(long, long);
+      qualflare.link('https://e/$long', name: long);
+      qualflare.tag(long);
+      qualflare.attachment(long, const [1]);
+      await qualflare.step(long, () {});
+    });
+    expect(out, hasLength(6));
+    expect(out[0]['name'], hasLength(8192));
+    expect(out[0]['value'], hasLength(8192));
+    expect(out[1]['url'], hasLength(8192));
+    expect(out[1]['name'], hasLength(8192));
+    expect((out[2]['tags'] as List).single, hasLength(8192));
+    expect(out[3]['name'], hasLength(8192));
+    expect(out[4]['name'], hasLength(8192));
+  });
+
+  test('empty step name becomes step', () async {
+    final out = await capture(() => qualflare.step('  ', () {}));
+    expect(out.first['k'], 'step+');
+    expect(out.first['name'], 'step');
+  });
+
+  test('does not split surrogate pairs', () async {
+    // 8191 'a's, then an emoji whose two UTF-16 units straddle the 8192 cap.
+    final text = '${'a' * 8191}\u{1F600}b';
+    final out = await capture(() async {
+      qualflare.label('n', text);
+      try {
+        await qualflare.step('s', () => throw text);
+      } catch (_) {}
+    });
+    expect(out[0]['value'], 'a' * 8191);
+    expect(out.last['k'], 'step-');
+    expect(out.last['error'], 'a' * 8191);
+    // A pair that fits is kept whole.
+    final fits = '${'a' * 8190}\u{1F600}b';
+    final kept = await capture(() => qualflare.label('n', fits));
+    expect(kept.single['value'], '${'a' * 8190}\u{1F600}');
+  });
+
+  test('step rethrows a StateError unchanged', () async {
+    final error = StateError('bad state');
+    Object? caught;
+    final out = await capture(() async {
+      try {
+        await qualflare.step('s', () => throw error);
+      } catch (e) {
+        caught = e;
+      }
+    });
+    expect(caught, same(error));
+    expect(out.last['status'], 'error');
+    expect(out.last['error'], 'Bad state: bad state');
+  });
+
+  test('step started from a Timer nests', () async {
+    final out = await capture(() async {
+      await qualflare.step('outer', () async {
+        final done = Completer<void>();
+        Timer(Duration.zero, () async {
+          await qualflare.step('in timer', () {});
+          done.complete();
+        });
+        await done.future;
+      });
+    });
+    final starts = out.where((m) => m['k'] == 'step+').toList();
+    expect(starts.map((m) => m['name']), ['outer', 'in timer']);
+    expect(starts[1]['parent'], starts[0]['id']);
+  });
+
+  test('the step zone key is private', () async {
+    // A zone value under any key user code can name must not look like a
+    // parent step.
+    final out = await capture(() => runZoned(
+          () => qualflare.step('s', () {}),
+          zoneValues: {#qualflareStep: 999},
+        ));
+    expect(out.first.containsKey('parent'), isFalse);
   });
 }

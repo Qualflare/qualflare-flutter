@@ -60,4 +60,14 @@ void main() {
     expect(decode(lines.single), containsPair('n', 1));
     expect(decode(lines.single), containsPair('data', ''));
   });
+
+  test('escapes line separators', () {
+    const value = 'a\u2028b\u2029c\u0085d';
+    final line = encodeMarker({'k': 'label', 'name': 'n', 'value': value});
+    expect(line, isNot(contains('\u2028')));
+    expect(line, isNot(contains('\u2029')));
+    expect(line, isNot(contains('\u0085')));
+    expect(line, contains(r'a\u2028b\u2029c\u0085d'));
+    expect(decode(line)['value'], value);
+  });
 }

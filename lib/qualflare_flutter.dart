@@ -3,3 +3,4 @@
 library;
 
 export 'src/qualflare.dart' show Qualflare, qualflare;
+export 'src/test_widgets.dart' show qualflareTestWidgets;

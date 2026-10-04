@@ -1,9 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart' show TestFailure;
+import 'package:flutter_test/flutter_test.dart' show TestFailure, WidgetTester;
 import 'package:test_api/hooks.dart' show OutsideTestException, TestHandle;
 
+import 'fonts.dart';
 import 'marker.dart';
+import 'screenshot.dart';
 
 /// Largest single attachment, in decoded bytes; at the cap is allowed.
 const maxAttachmentBytes = 5 * 1024 * 1024;
@@ -11,14 +13,16 @@ const maxAttachmentBytes = 5 * 1024 * 1024;
 /// Largest total of attachment bytes for one test (all attempts together).
 const maxTestAttachmentBytes = 20 * 1024 * 1024;
 
-/// Longest step error message kept in a `step-` marker.
-const maxStepErrorLength = 8192;
+/// Longest name, value, URL or step error message kept, in UTF-16 code
+/// units; longer ones are cut, never inside a surrogate pair.
+const maxTextLength = 8192;
 
 const _linkTypes = {'issue', 'tms', 'custom'};
 const _priorities = {'low', 'medium', 'high', 'critical'};
 
-/// The zone key holding the id of the step whose body is running.
-const _stepZoneKey = #qualflareStep;
+/// The zone key holding the id of the step whose body is running. An object
+/// no other code can name, so no other zone value can pass for a step.
+final _stepZoneKey = Object();
 
 /// The Qualflare runtime API for Flutter tests.
 ///
@@ -38,7 +42,7 @@ class Qualflare {
 
   /// Arbitrary name/value metadata (owner, epic, feature, story …).
   void label(String name, String value) {
-    final n = name.trim(), v = value.trim();
+    final n = _text(name), v = _text(value);
     if (n.isEmpty || v.isEmpty || !_inTest) return;
     _emit({'k': 'label', 'name': n, 'value': v});
   }
@@ -46,14 +50,14 @@ class Qualflare {
   /// A link to an issue, a test-management case or any other URL. [type] is
   /// `issue`, `tms` or `custom`.
   void link(String url, {String type = 'custom', String? name}) {
-    final u = url.trim();
+    final u = _text(url);
     if (u.isEmpty || !_inTest) return;
     if (!_linkTypes.contains(type)) {
       _warn(
           'link type "$type" is not one of issue, tms, custom; link $u ignored');
       return;
     }
-    final n = name?.trim();
+    final n = name == null ? null : _text(name);
     _emit({
       'k': 'link',
       'type': type,
@@ -69,7 +73,7 @@ class Qualflare {
   void tags(List<String> tags) {
     final kept = [
       for (final t in tags)
-        if (t.trim().isNotEmpty) t.trim(),
+        if (_text(t).isNotEmpty) _text(t),
     ];
     if (kept.isEmpty || !_inTest) return;
     _emit({'k': 'tag', 'tags': kept});
@@ -98,7 +102,7 @@ class Qualflare {
       'k': 'step+',
       'id': id,
       'parent': Zone.current[_stepZoneKey] as int?,
-      'name': name.trim(),
+      'name': _text(name).isEmpty ? 'step' : _text(name),
       't': _now(),
     });
     try {
@@ -107,16 +111,12 @@ class Qualflare {
       _emit({'k': 'step-', 'id': id, 'status': 'passed', 't': _now()});
       return result;
     } catch (e) {
-      var message = '$e';
-      if (message.length > maxStepErrorLength) {
-        message = message.substring(0, maxStepErrorLength);
-      }
       _emit({
         'k': 'step-',
         'id': id,
         'status': e is TestFailure ? 'failed' : 'error',
         't': _now(),
-        'error': message,
+        'error': _cap('$e'),
       });
       rethrow;
     }
@@ -129,7 +129,7 @@ class Qualflare {
       {String mimeType = 'application/octet-stream'}) {
     final test = _testName;
     if (test == null) return;
-    final n = name.trim().isEmpty ? 'attachment' : name.trim();
+    final n = _text(name).isEmpty ? 'attachment' : _text(name);
     if (bytes.length > maxAttachmentBytes) {
       _warn(
           'attachment "$n" is ${bytes.length} bytes, over the $maxAttachmentBytes-byte cap; dropped');
@@ -148,6 +148,41 @@ class Qualflare {
       print(line); // ignore: avoid_print
     }
   }
+
+  /// Attaches a PNG of the screen to the current test as `<name>.png`.
+  ///
+  /// Captures what was last painted, without pumping or settling, so it works
+  /// mid-animation; pump first to capture a change. By default Flutter's root
+  /// layer is rendered. With [native] in an `integration_test` run on a
+  /// device the platform captures the screen instead, which includes platform
+  /// views (maps, web views) and, on Android, the status bar; elsewhere
+  /// [native] is ignored.
+  ///
+  /// A failed capture records a warning instead; it never fails the test.
+  /// Attachment caps apply.
+  Future<void> screenshot(WidgetTester tester, String name,
+      {bool native = false}) async {
+    if (!_inTest) return;
+    final n = _text(name).isEmpty ? 'screenshot' : _text(name);
+    final List<int> png;
+    try {
+      png = await captureScreenshot(tester, n, native: native);
+    } catch (e) {
+      _warn(_cap('screenshot "$n" failed: $e'));
+      return;
+    }
+    attachment('$n.png', png, mimeType: 'image/png');
+  }
+
+  /// Loads the app's fonts (from its `FontManifest.json`) and Roboto, so
+  /// screenshots in host widget tests show words instead of the test font's
+  /// boxes.
+  ///
+  /// Opt-in, because it changes text metrics for the rest of the test file:
+  /// call it in `setUpAll`, in `flutter_test_config.dart`, or inside
+  /// `tester.runAsync`. Calling it again does nothing; on a device, where
+  /// real fonts are already used, it does nothing.
+  Future<void> loadFonts() => loadTestFonts();
 
   /// The running test's full name, or null outside a test.
   ///
@@ -178,4 +213,17 @@ class Qualflare {
       print(encodeMarker(fields)); // ignore: avoid_print
 
   static int _now() => DateTime.now().millisecondsSinceEpoch;
+
+  /// [s] trimmed and capped at [maxTextLength].
+  static String _text(String s) => _cap(s.trim());
+
+  /// [s] cut to at most [maxTextLength] code units, keeping surrogate pairs
+  /// whole.
+  static String _cap(String s) {
+    if (s.length <= maxTextLength) return s;
+    var end = maxTextLength;
+    final last = s.codeUnitAt(end - 1);
+    if (last >= 0xD800 && last <= 0xDBFF) end--; // a pair's first half
+    return s.substring(0, end);
+  }
 }
