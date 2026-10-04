@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:leak_tracker_testing/leak_tracker_testing.dart';
 import 'package:qualflare_flutter/qualflare_flutter.dart';
 import 'package:qualflare_flutter/src/test_widgets.dart'
     show runWithFailureScreenshot;
@@ -69,4 +70,10 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: Text('hello')));
     expect(find.text('hello'), findsOneWidget);
   });
+
+  qualflareTestWidgets('qualflareTestWidgets forwards experimentalLeakTesting',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Text('leaks')));
+    expect(find.text('leaks'), findsOneWidget);
+  }, experimentalLeakTesting: LeakTesting.settings.withIgnoredAll());
 }

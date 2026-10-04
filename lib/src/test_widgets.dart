@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:leak_tracker_testing/leak_tracker_testing.dart'
+    show LeakTesting;
 import 'package:meta/meta.dart' show isTest;
 
 import 'qualflare.dart';
@@ -20,6 +22,7 @@ void qualflareTestWidgets(
   TestVariant<Object?> variant = const DefaultTestVariant(),
   dynamic tags,
   int? retry,
+  LeakTesting? experimentalLeakTesting,
 }) {
   testWidgets(
     description,
@@ -30,6 +33,7 @@ void qualflareTestWidgets(
     variant: variant,
     tags: tags,
     retry: retry,
+    experimentalLeakTesting: experimentalLeakTesting,
   );
 }
 

@@ -15,7 +15,10 @@ bool _androidSurfaceConverted = false;
 ///
 /// By default the root layer is rendered. With [native] on an
 /// `integration_test` binding the platform captures the screen instead, which
-/// includes platform views; elsewhere [native] is ignored.
+/// includes platform views; elsewhere [native] is ignored. The one exception
+/// to "never pumps": on Android the first native capture converts the Flutter
+/// surface to an image view and pumps one frame so the new surface has
+/// something to show, as `integration_test` requires.
 ///
 /// Throws if the capture fails.
 Future<List<int>> captureScreenshot(
@@ -23,14 +26,20 @@ Future<List<int>> captureScreenshot(
   String name, {
   required bool native,
 }) async {
+  final binding = tester.binding;
+  final useNative = native && binding is IntegrationTestWidgetsFlutterBinding;
+  if (useNative && !kIsWeb && Platform.isAndroid && !_androidSurfaceConverted) {
+    await binding.convertFlutterSurfaceToImage();
+    _androidSurfaceConverted = true;
+    await tester.pump();
+  }
   // runAsync reports an error thrown by its callback as a test failure, so
   // the callback returns its error instead of throwing it.
   final result = await tester.runAsync<(List<int>?, Object?, StackTrace?)>(
     () async {
       try {
-        final binding = tester.binding;
-        if (native && binding is IntegrationTestWidgetsFlutterBinding) {
-          return (await _native(binding, name), null, null);
+        if (useNative) {
+          return (await binding.takeScreenshot(name), null, null);
         }
         return (await _rootLayer(tester), null, null);
       } catch (e, st) {
@@ -42,15 +51,6 @@ Future<List<int>> captureScreenshot(
   final (bytes, error, stack) = result;
   if (error != null) Error.throwWithStackTrace(error, stack!);
   return bytes!;
-}
-
-Future<List<int>> _native(
-    IntegrationTestWidgetsFlutterBinding binding, String name) async {
-  if (!kIsWeb && Platform.isAndroid && !_androidSurfaceConverted) {
-    await binding.convertFlutterSurfaceToImage();
-    _androidSurfaceConverted = true;
-  }
-  return binding.takeScreenshot(name);
 }
 
 Future<List<int>> _rootLayer(WidgetTester tester) async {

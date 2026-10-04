@@ -52,8 +52,9 @@ characters are cut.
 settles, so it works mid-animation; pump first if you want a change on screen. It renders Flutter's
 root layer, the same way in widget tests and in `integration_test` runs on a device or emulator. In an
 `integration_test` run, `native: true` lets the platform capture the screen instead, which also shows
-platform views (maps, web views) and, on Android, the status bar. A capture that fails records a
-warning; it never fails the test.
+platform views (maps, web views) and, on Android, the status bar; the first native capture on Android
+switches Flutter to an image surface and pumps one frame, as `integration_test` requires. A capture
+that fails records a warning; it never fails the test.
 
 `qualflareTestWidgets` takes the same arguments as `testWidgets`. When its body throws (a failed
 `expect`, a missing widget), it attaches `failure.png` and rethrows, so the test fails exactly as

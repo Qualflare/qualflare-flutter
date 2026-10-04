@@ -156,7 +156,9 @@ class Qualflare {
   /// layer is rendered. With [native] in an `integration_test` run on a
   /// device the platform captures the screen instead, which includes platform
   /// views (maps, web views) and, on Android, the status bar; elsewhere
-  /// [native] is ignored.
+  /// [native] is ignored. The first native capture on Android converts the
+  /// Flutter surface to an image and pumps one frame, as `integration_test`
+  /// requires.
   ///
   /// A failed capture records a warning instead; it never fails the test.
   /// Attachment caps apply.
