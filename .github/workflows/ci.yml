@@ -23,3 +23,11 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze --fatal-infos
       - run: flutter test
+      - name: Markers land on the right test in the JSON results
+        run: |
+          set -euo pipefail
+          flutter test --file-reporter json:results.json test/qualflare_widget_test.dart
+          id=$(jq -r 'select(.type=="testStart" and .test.name=="works inside testWidgets") | .test.id' results.json)
+          test -n "$id"
+          jq -s -e --argjson id "$id" '[.[] | select(.type=="print" and .testID==$id) | .message | select(startswith("##qualflare[v1] "))] | length == 3' results.json
+          jq -s -e --argjson id "$id" '[.[] | select(.type=="print" and .testID==$id) | .message | select(startswith("##qualflare[v1] {\"k\":\"label\""))] | length == 1 and (.[0] | contains("mobile-team"))' results.json
