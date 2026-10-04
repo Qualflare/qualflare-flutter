@@ -48,8 +48,8 @@ characters are cut.
 
 ## Screenshots
 
-`qualflare.screenshot(tester, name)` attaches a PNG of what was last painted. It never pumps or
-settles, so it works mid-animation; pump first if you want a change on screen. It renders Flutter's
+`qualflare.screenshot(tester, name)` attaches a PNG of the screen. It never settles, so it works
+mid-animation; it pumps one frame only if the screen has changes not yet painted. It renders Flutter's
 root layer, the same way in widget tests and in `integration_test` runs on a device or emulator. In an
 `integration_test` run, `native: true` lets the platform capture the screen instead, which also shows
 platform views (maps, web views) and, on Android, the status bar; the first native capture on Android

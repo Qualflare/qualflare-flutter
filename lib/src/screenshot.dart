@@ -10,15 +10,16 @@ import 'package:integration_test/integration_test.dart'
 /// which the native capture needs; done once per process.
 bool _androidSurfaceConverted = false;
 
-/// The current screen as PNG bytes. Never pumps or settles: it captures what
-/// was last painted.
+/// The current screen as PNG bytes. Never settles. It pumps one frame only
+/// if the screen has changes not yet painted (on a device nothing paints
+/// between test code and the capture), so what it captures is current.
 ///
 /// By default the root layer is rendered. With [native] on an
 /// `integration_test` binding the platform captures the screen instead, which
-/// includes platform views; elsewhere [native] is ignored. The one exception
-/// to "never pumps": on Android the first native capture converts the Flutter
-/// surface to an image view and pumps one frame so the new surface has
-/// something to show, as `integration_test` requires.
+/// includes platform views; elsewhere [native] is ignored. On Android the
+/// first native capture also converts the Flutter surface to an image view
+/// and pumps one frame so the new surface has something to show, as
+/// `integration_test` requires.
 ///
 /// Throws if the capture fails.
 Future<List<int>> captureScreenshot(
@@ -33,6 +34,7 @@ Future<List<int>> captureScreenshot(
     _androidSurfaceConverted = true;
     await tester.pump();
   }
+  if (_needsPaint(tester)) await tester.pump();
   // runAsync reports an error thrown by its callback as a test failure, so
   // the callback returns its error instead of throwing it.
   final result = await tester.runAsync<(List<int>?, Object?, StackTrace?)>(
@@ -51,6 +53,24 @@ Future<List<int>> captureScreenshot(
   final (bytes, error, stack) = result;
   if (error != null) Error.throwWithStackTrace(error, stack!);
   return bytes!;
+}
+
+/// Whether the repaint boundary that the root-layer capture renders has
+/// changes not yet painted. Only known when asserts are on (debug and test
+/// builds); without asserts the capture does not check it either.
+bool _needsPaint(WidgetTester tester) {
+  var renderObject = tester.binding.rootElement?.renderObject;
+  if (renderObject == null) return false;
+  while (!renderObject!.isRepaintBoundary) {
+    renderObject = renderObject.parent;
+    if (renderObject == null) return false;
+  }
+  var needsPaint = false;
+  assert(() {
+    needsPaint = renderObject!.debugNeedsPaint;
+    return true;
+  }());
+  return needsPaint;
 }
 
 Future<List<int>> _rootLayer(WidgetTester tester) async {

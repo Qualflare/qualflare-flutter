@@ -73,6 +73,22 @@ void main() {
     expect(attachments(out).keys, ['spinning.png']);
   });
 
+  testWidgets('screenshot paints pending changes with one frame',
+      (tester) async {
+    await tester.pumpWidget(
+        const MaterialApp(home: ColoredBox(color: Color(0xFF009688))));
+    // As on a device: something changed after the last frame, so the root
+    // layer is out of date and cannot be captured as it is.
+    tester.binding.rootElement!.renderObject!.markNeedsPaint();
+    var frames = 0;
+    // Persistent callbacks cannot be removed; this one only counts.
+    tester.binding.addPersistentFrameCallback((_) => frames++);
+    final out = await capture(() => qualflare.screenshot(tester, 'pending'));
+    expect(warnings(out), isEmpty);
+    expect(attachments(out).keys, ['pending.png']);
+    expect(frames, 1);
+  });
+
   test('screenshot outside a test does nothing', () {
     expect(outsideError, isNull);
     expect(outsideTest, isEmpty);

@@ -151,8 +151,8 @@ class Qualflare {
 
   /// Attaches a PNG of the screen to the current test as `<name>.png`.
   ///
-  /// Captures what was last painted, without pumping or settling, so it works
-  /// mid-animation; pump first to capture a change. By default Flutter's root
+  /// Never settles, so it works mid-animation. It pumps one frame only if the
+  /// screen has changes not yet painted, so the capture shows them. By default Flutter's root
   /// layer is rendered. With [native] in an `integration_test` run on a
   /// device the platform captures the screen instead, which includes platform
   /// views (maps, web views) and, on Android, the status bar; elsewhere
