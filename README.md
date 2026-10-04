@@ -5,7 +5,16 @@
 Labels, links, steps and screenshots for Flutter widget and `integration_test` tests, reported to
 [Qualflare](https://qualflare.com/flutter-test-reporting/).
 
-> **Status: pre-release.** The API is being built; the first release is 0.1.0.
+## Install
+
+```bash
+flutter pub add --dev qualflare_flutter
+```
+
+Uploading results needs the `qf` CLI, version 0.3.0 or later: `npm install -g @qualflare/cli`, or
+download a binary from the [GitHub release](https://github.com/Qualflare/qualflare-cli/releases).
+
+## Quick start
 
 Flutter results already reach Qualflare without this package:
 
@@ -14,11 +23,17 @@ flutter test --file-reporter json:flutter-results.json
 qf <project> collect flutter-results.json
 ```
 
+For `integration_test` on a device or emulator, add the platform so the results are tagged with it:
+
+```bash
+flutter test integration_test -d <device> --file-reporter json:flutter-results.json
+qf <project> collect flutter-results.json --platform android   # or ios
+```
+
 `qf collect` reads statuses, durations, failure messages, retries and output from that file. This
-package adds what only the test author knows — labels, links, tags, priority, named steps and
-screenshots — for widget tests and for tests on a real device or emulator. Its data travels inside the
-same results file, so the two commands stay the same. Reading it needs `qf` 0.3.0 or later (coming with
-this package's 0.1.0).
+package adds what only the test author knows: labels, links, tags, priority, named steps and
+screenshots, for widget tests and for tests on a real device or emulator. Its data travels inside the
+same results file, so the two commands stay the same. Reading it needs `qf` 0.3.0 or later.
 
 ## API
 
@@ -35,6 +50,7 @@ testWidgets('pays with a card', (tester) async {
   });
   qualflare.attachment('response.json', bytes, mimeType: 'application/json');
   await qualflare.screenshot(tester, 'checkout');      // checkout.png on this test
+  // await qualflare.screenshot(tester, 'home', native: true); // platform capture, on a device
 });
 
 qualflareTestWidgets('pays with a card', (tester) async {
@@ -82,6 +98,23 @@ so it is opt-in. Inside a `testWidgets` body, call it through `tester.runAsync`.
 binding to exist already, so call it from `setUpAll` or a test, not from `main` or
 `flutter_test_config.dart`; there it throws a `StateError` rather than install a binding. It does nothing on a
 device, where real fonts are used already, and nothing when called again.
+
+## Notes
+
+- Markers and screenshot data are printed as lines in the test's output, so they also appear in the
+  console and CI log of `flutter test`.
+- Non-image attachments travel inline in the results file. Keep them small: `qf` drops a non-image
+  attachment over 1 MiB, and further ones once a results file passes 8 MiB, each with a warning.
+- If your own test already calls `convertFlutterSurfaceToImage()`, `native: true` screenshots warn.
+  Omit `native`, or don't convert the surface yourself.
+- Calling `screenshot` inside your own `tester.runAsync` warns. Call it outside.
+- Web (`flutter test --platform chrome`) is not supported, because the package uses `dart:io`.
+- Calls in `setUpAll` and `tearDownAll` are ignored.
+
+## Links
+
+- [Flutter test reporting in Qualflare](https://qualflare.com/flutter-test-reporting/)
+- [Source and issues on GitHub](https://github.com/Qualflare/qualflare-flutter)
 
 ## License
 

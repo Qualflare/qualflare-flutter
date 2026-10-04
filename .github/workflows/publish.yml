@@ -1,0 +1,24 @@
+# Publishes to pub.dev with automated publishing (OIDC, no stored secrets):
+# https://dart.dev/tools/pub/automated-publishing
+#
+# Before this works, enable automated publishing on the package's pub.dev admin
+# page (Admin > Automated publishing): repository Qualflare/qualflare-flutter,
+# tag pattern v{{version}}. This can only be done after the first manual publish.
+#
+# The reusable workflow below installs the Flutter SDK and publishes with the
+# Flutter SDK's `dart pub publish`, so it handles Flutter packages.
+#
+# To release: set `version` in pubspec.yaml, update CHANGELOG.md, merge, then
+#   git tag v0.1.0 && git push origin v0.1.0
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  publish:
+    permissions:
+      id-token: write # Required for authentication using OIDC
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
