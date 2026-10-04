@@ -32,4 +32,12 @@ qf <project> collect results.json --platform android   # or ios, for integration
 `.github/workflows/ci.yml` in the repository runs the example on the host, on an Android emulator and
 on an iOS simulator. Each run writes a JSON results file, and `tool/assert_markers.sh` checks that the
 markers of every kind landed on the right test (for the device runs, also that the native screenshot
-arrived). The results files are kept as workflow artifacts, so they can be passed to `qf collect`.
+arrived). The results files are kept as workflow artifacts.
+
+On pushes to `main`, the Android and iOS jobs also run the example a second time with
+`--exclude-tags demo-failure` and upload that run with `qf` 0.3.0 (`--platform android` or `ios`) to the
+public project at
+[reports.qualflare.com/p/qualflare-flutter](https://reports.qualflare.com/p/qualflare-flutter/launches).
+`tool/assert-launch-landed.py` then checks that a new launch appeared. The test that fails on purpose
+carries the `demo-failure` tag (declared in `dart_test.yaml`), so the uploaded launches contain only
+passing and retried tests.
