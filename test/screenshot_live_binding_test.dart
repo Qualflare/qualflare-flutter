@@ -45,4 +45,20 @@ void main() {
     expect(warnings(out), isEmpty);
     expect(attachments(out).keys, ['confirmed.png']);
   });
+  // The host running `flutter test` is neither Android nor iOS: native: true
+  // must use the root layer rather than ask a platform that cannot capture.
+  testWidgets(
+      'native on the integration binding off-device uses the root layer',
+      (tester) async {
+    await tester.pumpWidget(
+        const MaterialApp(home: ColoredBox(color: Color(0xFFFF0000))));
+    final out = await capture(
+        () => qualflare.screenshot(tester, 'native', native: true));
+    expect(warnings(out), isEmpty);
+    final shots = attachments(out);
+    expect(shots.keys, ['native.png']);
+    // PNG signature.
+    expect(shots['native.png']!.take(8),
+        [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  });
 }

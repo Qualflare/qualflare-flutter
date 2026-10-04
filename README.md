@@ -52,7 +52,7 @@ characters are cut.
 mid-animation; only while the screen has changes not yet painted does it pump a frame (a few at
 most). It renders Flutter's
 root layer, the same way in widget tests and in `integration_test` runs on a device or emulator. In an
-`integration_test` run, `native: true` lets the platform capture the screen instead, which also shows
+`integration_test` run on Android or iOS, `native: true` lets the platform capture the screen instead, which also shows
 platform views (maps, web views) and, on Android, the status bar; the first native capture on Android
 switches Flutter to an image surface and pumps one frame, as `integration_test` requires. A capture
 that fails records a warning; it never fails the test.
@@ -76,7 +76,9 @@ setUpAll(() => qualflare.loadFonts());
 
 `loadFonts` loads the fonts in your app's `FontManifest.json` and Roboto (Material's default) from the
 Flutter SDK. It changes text sizes for the rest of the file, which can affect layout and golden tests,
-so it is opt-in. Inside a `testWidgets` body, call it through `tester.runAsync`. It does nothing on a
+so it is opt-in. Inside a `testWidgets` body, call it through `tester.runAsync`. It needs the test
+binding to exist already, so call it from `setUpAll` or a test, not from `main` or
+`flutter_test_config.dart`; there it throws a `StateError` rather than install a binding. It does nothing on a
 device, where real fonts are used already, and nothing when called again.
 
 ## License

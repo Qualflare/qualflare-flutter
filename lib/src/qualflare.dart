@@ -154,10 +154,10 @@ class Qualflare {
   /// Never settles, so it works mid-animation. Only while the screen has
   /// changes not yet painted it pumps a frame (a few at most), so the capture
   /// shows them. By default Flutter's root
-  /// layer is rendered. With [native] in an `integration_test` run on a
-  /// device the platform captures the screen instead, which includes platform
+  /// layer is rendered. With [native] in an `integration_test` run on Android
+  /// or iOS the platform captures the screen instead, which includes platform
   /// views (maps, web views) and, on Android, the status bar; elsewhere
-  /// [native] is ignored. The first native capture on Android converts the
+  /// (widget tests, desktop, web) [native] is ignored. The first native capture on Android converts the
   /// Flutter surface to an image and pumps one frame, as `integration_test`
   /// requires.
   ///
@@ -182,9 +182,13 @@ class Qualflare {
   /// boxes.
   ///
   /// Opt-in, because it changes text metrics for the rest of the test file:
-  /// call it in `setUpAll`, in `flutter_test_config.dart`, or inside
+  /// call it in `setUpAll` or, inside a `testWidgets` body, through
   /// `tester.runAsync`. Calling it again does nothing; on a device, where
   /// real fonts are already used, it does nothing.
+  ///
+  /// It never installs a test binding, so an `integration_test` binding can
+  /// still be initialised after it. Called before any binding exists (from
+  /// `main` or `flutter_test_config.dart`), it throws a [StateError].
   Future<void> loadFonts() => loadTestFonts();
 
   /// The running test's full name, or null outside a test.

@@ -25,8 +25,9 @@ jq -s -e "$defs"'
   and ($m | any(.k=="step+" and .parent != null))
   and ($m | any(.k=="att" and .name=="order.json" and .type=="application/json"))
   and ($m | any(.k=="att" and .name=="confirmed.png" and .type=="image/png"))
-  and ($results | to_entries | map(select(.value=="success")) | length > 0)
-' "$file" >/dev/null || { echo "pays for the cart: a marker kind is missing" >&2; exit 1; }
+  and ((.[] | select(.type=="testStart" and .test.name=="pays for the cart") | .test.id | tostring) as $id
+       | $results[$id] == "success")
+' "$file" >/dev/null || { echo "pays for the cart: a marker kind is missing or the test did not pass" >&2; exit 1; }
 
 jq -s -e "$defs"'
   (markers("shows a receipt (fails on purpose)") | any(.k=="att" and .name=="failure.png"))

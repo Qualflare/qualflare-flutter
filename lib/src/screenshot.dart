@@ -19,14 +19,19 @@ bool _androidSurfaceConverted = false;
 /// holding the capture; it then fails with a warning instead.
 const _maxPaintFrames = 5;
 
+/// Whether this runs on Android or iOS, the platforms `integration_test` can
+/// capture natively.
+bool get _onDevice => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
 /// The current screen as PNG bytes. Never settles. Only while the screen has
 /// changes not yet painted (on a device nothing paints between test code and
 /// the capture) it pumps a frame, at most [_maxPaintFrames], so what it
 /// captures is current.
 ///
 /// By default the root layer is rendered. With [native] on an
-/// `integration_test` binding the platform captures the screen instead, which
-/// includes platform views; elsewhere [native] is ignored. On Android the
+/// `integration_test` binding on Android or iOS the platform captures the
+/// screen instead, which includes platform views; elsewhere (widget tests,
+/// desktop and web) [native] is ignored. On Android the
 /// first native capture also converts the Flutter surface to an image view
 /// and pumps one frame so the new surface has something to show, as
 /// `integration_test` requires.
@@ -38,8 +43,9 @@ Future<List<int>> captureScreenshot(
   required bool native,
 }) async {
   final binding = tester.binding;
-  final useNative = native && binding is IntegrationTestWidgetsFlutterBinding;
-  if (useNative && !kIsWeb && Platform.isAndroid && !_androidSurfaceConverted) {
+  final useNative =
+      native && binding is IntegrationTestWidgetsFlutterBinding && _onDevice;
+  if (useNative && Platform.isAndroid && !_androidSurfaceConverted) {
     await binding.convertFlutterSurfaceToImage();
     _androidSurfaceConverted = true;
     await tester.pump();

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
-import 'package:flutter_test/flutter_test.dart' show TestWidgetsFlutterBinding;
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:integration_test/integration_test.dart'
     show IntegrationTestWidgetsFlutterBinding;
 
@@ -12,15 +12,32 @@ Future<void>? _loaded;
 /// Loads the app's fonts and Roboto for host widget tests, so text renders
 /// as words instead of the test font's boxes. Does nothing on a device, where
 /// real fonts are already used, and only loads once per process.
+///
+/// Never installs a binding: one installed here would be the host test
+/// binding, and an `integration_test` binding could not initialise after it.
+/// Throws a [StateError] when no binding exists yet.
 Future<void> loadTestFonts() {
-  if (TestWidgetsFlutterBinding.ensureInitialized()
-      is IntegrationTestWidgetsFlutterBinding) {
-    return Future.value();
+  final binding = _currentBinding();
+  if (binding == null) {
+    throw StateError('qualflare.loadFonts() must be called from setUpAll or '
+        'a test, after the test binding exists');
   }
+  if (binding is IntegrationTestWidgetsFlutterBinding) return Future.value();
   return _loaded ??= _load().catchError((Object e, StackTrace st) {
     _loaded = null; // let a later call try again
     Error.throwWithStackTrace(e, st);
   });
+}
+
+/// The widgets binding, or null if none has been initialised. Reading
+/// [WidgetsBinding.instance] before one exists throws (an assertion in debug
+/// builds, a null check otherwise) and creates nothing.
+WidgetsBinding? _currentBinding() {
+  try {
+    return WidgetsBinding.instance;
+  } catch (_) {
+    return null;
+  }
 }
 
 Future<void> _load() async {
