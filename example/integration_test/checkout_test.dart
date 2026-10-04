@@ -43,7 +43,10 @@ void main() {
     await qualflare.screenshot(tester, 'confirmed');
   });
 
-  qualflareTestWidgets('shows a receipt (fails on purpose)', (tester) async {
+  // Tagged so the dogfood upload can leave it out: it fails by design, to prove
+  // failure screenshots work, and would otherwise keep the public badge red.
+  qualflareTestWidgets('shows a receipt (fails on purpose)',
+      tags: ['demo-failure'], (tester) async {
     await tester.pumpWidget(const CheckoutApp());
     expect(find.text('Receipt'), findsOneWidget);
   });

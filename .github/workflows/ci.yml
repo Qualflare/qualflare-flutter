@@ -59,6 +59,8 @@ jobs:
 
   example-android:
     name: Example (Android emulator)
+    env:
+      DOGFOOD: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -78,11 +80,47 @@ jobs:
           api-level: 34
           arch: x86_64
           working-directory: example
-          script: flutter test integration_test/checkout_test.dart -d emulator-5554 --file-reporter json:../results-android.json || true
+          script: |
+            flutter test integration_test/checkout_test.dart -d emulator-5554 --file-reporter json:../results-android.json || true
+            [ "$DOGFOOD" != true ] || flutter test integration_test/checkout_test.dart -d emulator-5554 --exclude-tags demo-failure --file-reporter json:../dogfood-android.json || true
       - name: Markers of every kind landed on the right tests, native screenshot included
         run: |
           set -euo pipefail
           example/tool/assert_markers.sh results-android.json native
+      # Dogfood, main only: the example's results land in the qualflare-flutter
+      # project that the README badge reads. The upload comes from a second run
+      # without the deliberately failing test (tag demo-failure), so the badge
+      # reflects real health; the full run above keeps every marker check.
+      - name: Install qf
+        if: env.DOGFOOD == 'true'
+        run: |
+          npm install -g @qualflare/cli
+          qf version
+      - name: Record the project's run count before uploading
+        id: runs_before
+        if: env.DOGFOOD == 'true'
+        run: echo "count=$(python3 example/tool/assert-launch-landed.py qualflare-flutter --print)" >> "$GITHUB_OUTPUT"
+      # The token goes via the environment, not argv. `qf <id> collect` only exists
+      # after a successful login, so these cannot be reordered.
+      - name: Upload to Qualflare
+        id: upload
+        if: env.DOGFOOD == 'true'
+        env:
+          QF_TOKEN: ${{ secrets.QF_TOKEN }}
+          QF_BRANCH: ${{ github.ref_name }}
+          QF_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$QF_TOKEN" ]; then
+            echo "::error::QF_TOKEN is not set on this repository."
+            exit 1
+          fi
+          test -s dogfood-android.json
+          qf login qualflare-flutter --force
+          qf qualflare-flutter collect dogfood-android.json --platform android
+      - name: Assert the launch reached the project the badge reads
+        if: env.DOGFOOD == 'true' && steps.upload.outcome == 'success'
+        run: python3 example/tool/assert-launch-landed.py qualflare-flutter --before "${{ steps.runs_before.outputs.count }}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -92,6 +130,8 @@ jobs:
 
   example-ios:
     name: Example (iOS simulator)
+    env:
+      DOGFOOD: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -115,10 +155,49 @@ jobs:
         timeout-minutes: 70
         working-directory: example
         run: flutter test integration_test/checkout_test.dart -d "$SIM_UDID" --file-reporter json:../results-ios.json || true
+      - name: Run the example again for the dogfood upload, without the deliberate failure
+        if: env.DOGFOOD == 'true'
+        timeout-minutes: 70
+        working-directory: example
+        run: flutter test integration_test/checkout_test.dart -d "$SIM_UDID" --exclude-tags demo-failure --file-reporter json:../dogfood-ios.json || true
       - name: Markers of every kind landed on the right tests, native screenshot included
         run: |
           set -euo pipefail
           example/tool/assert_markers.sh results-ios.json native
+      # Dogfood, main only: the example's results land in the qualflare-flutter
+      # project that the README badge reads. The upload comes from a second run
+      # without the deliberately failing test (tag demo-failure), so the badge
+      # reflects real health; the full run above keeps every marker check.
+      - name: Install qf
+        if: env.DOGFOOD == 'true'
+        run: |
+          npm install -g @qualflare/cli
+          qf version
+      - name: Record the project's run count before uploading
+        id: runs_before
+        if: env.DOGFOOD == 'true'
+        run: echo "count=$(python3 example/tool/assert-launch-landed.py qualflare-flutter --print)" >> "$GITHUB_OUTPUT"
+      # The token goes via the environment, not argv. `qf <id> collect` only exists
+      # after a successful login, so these cannot be reordered.
+      - name: Upload to Qualflare
+        id: upload
+        if: env.DOGFOOD == 'true'
+        env:
+          QF_TOKEN: ${{ secrets.QF_TOKEN }}
+          QF_BRANCH: ${{ github.ref_name }}
+          QF_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$QF_TOKEN" ]; then
+            echo "::error::QF_TOKEN is not set on this repository."
+            exit 1
+          fi
+          test -s dogfood-ios.json
+          qf login qualflare-flutter --force
+          qf qualflare-flutter collect dogfood-ios.json --platform ios
+      - name: Assert the launch reached the project the badge reads
+        if: env.DOGFOOD == 'true' && steps.upload.outcome == 'success'
+        run: python3 example/tool/assert-launch-landed.py qualflare-flutter --before "${{ steps.runs_before.outputs.count }}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
