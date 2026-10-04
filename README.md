@@ -35,8 +35,9 @@ testWidgets('pays with a card', (tester) async {
 });
 ```
 
-The names match the `qualflare.*` API of Qualflare's JavaScript reporters. Outside a running test,
-every call does nothing. Attachments are capped at 5 MiB each and 20 MiB per test; anything over a cap
+The names match the `qualflare.*` API of Qualflare's JavaScript reporters. Calls in `setUp` and
+`tearDown` apply to each test; outside a running test, and in `setUpAll`/`tearDownAll`, every call does
+nothing. Attachments are capped at 5 MiB each and 20 MiB per test; anything over a cap
 is dropped with a warning in the test's output.
 
 ## License

@@ -150,12 +150,22 @@ class Qualflare {
   }
 
   /// The running test's full name, or null outside a test.
+  ///
+  /// `setUpAll` and `tearDownAll` run as hidden pseudo-tests named
+  /// `… (setUpAll)` / `… (tearDownAll)`. Results tools drop hidden tests, so
+  /// anything recorded there would vanish; they count as outside a test.
+  /// `setUp` and `tearDown` run inside each test and apply to it.
   String? get _testName {
+    final String name;
     try {
-      return TestHandle.current.name;
+      name = TestHandle.current.name;
     } on OutsideTestException {
       return null;
     }
+    if (name.endsWith('(setUpAll)') || name.endsWith('(tearDownAll)')) {
+      return null;
+    }
+    return name;
   }
 
   bool get _inTest => _testName != null;
